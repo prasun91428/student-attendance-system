@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Mark Attendance – EduTrack{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Mark Attendance</h1>
+        <p class="page-sub">Select course, semester &amp; section to record attendance</p>
+    </div>
+    {% if students %}
+    <button class="btn btn-primary" id="saveBtn" onclick="saveAttendance()">💾 Save Attendance</button>
+    {% endif %}
+</div>
+
+<!-- Class selector -->
+<div class="card filter-bar" style="margin-bottom:1.5rem">
+    <form method="GET" class="filter-form" id="attForm">
+        <select name="class_id" class="filter-select" onchange="this.form.submit()">
+            <option value="">— Select Class / Subject —</option>
+            {% set ns = namespace(cur_group='') %}
+            {% for cls in classes %}
+            {% set grp = cls.course ~ ' · ' ~ cls.branch ~ ' Sem ' ~ cls.semester ~ ' §' ~ cls.section %}
+            {% if grp != ns.cur_group %}
+            {% set ns.cur_group = grp %}
+            <optgroup label="━━ {{ grp }} ━━"></optgroup>
+            {% endif %}
+            <option value="{{ cls.id }}"
+                {% if class_id == cls.id|string %}selected{% endif %}>
+                {{ cls.subject }}
+            </option>
+            {% endfor %}
+        </select>
+        <input type="date" name="date" value="{{ sel_date }}" class="filter-input"
+               onchange="this.form.submit()" max="{{ sel_date }}" />
+    </form>
+</div>
+
+<!-- Class Info Banner -->
+{% if sel_class %}
+<div class="class-banner">
+    <span class="course-pill course-{{ sel_class.course | lower }} pill-lg">{{ sel_class.course }}</span>
+    <div class="banner-details">
+        <strong>{{ sel_class.branch }}</strong> — {{ sel_class.subject }}
+        <span class="banner-meta">Semester {{ sel_class.semester }} &nbsp;|&nbsp; Section {{ sel_class.section }}</span>
+    </div>
+    <div class="banner-date">📅 {{ sel_date }}</div>
+</div>
+{% endif %}
+
+{% if students %}
+<!-- Quick-mark -->
+<div class="quick-mark-bar">
+    <button class="btn btn-sm btn-green"  onclick="markAll('Present')">✅ All Present</button>
+    <button class="btn btn-sm btn-red"    onclick="markAll('Absent')">❌ All Absent</button>
+    <button class="btn btn-sm btn-yellow" onclick="markAll('Late')">⏰ All Late</button>
+    <span class="quick-count" id="presentCount">Present: 0</span>
+    <span class="quick-count absent" id="absentCount">Absent: 0</span>
+</div>
+
+<div class="card">
+    <table class="data-table" id="attTable">
+        <thead>
+            <tr>
+                <th>#</th><th>Roll No</th><th>Student Name</th>
+                <th class="pill-col">✅ Present</th>
+                <th class="pill-col">❌ Absent</th>
+                <th class="pill-col">⏰ Late</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in students %}
+            <tr data-sid="{{ s.id }}" data-cid="{{ class_id }}">
+                <td>{{ loop.index }}</td>
+                <td><code class="roll-badge">{{ s.roll_no }}</code></td>
+                <td><strong>{{ s.name }}</strong></td>
+                {% for status in ['Present','Absent','Late'] %}
+                <td class="att-cell">
+                    <label class="radio-pill pill-{{ status | lower }}">
+                        <input type="radio" name="status_{{ s.id }}"
+                               value="{{ status }}"
+                               {% if s.status == status %}checked{% endif %}
+                               onchange="highlightRow(this); updateCounts()" />
+                        {{ status }}
+                    </label>
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div id="saveResult" class="flash" style="display:none;margin-top:1rem"></div>
+
+{% elif class_id %}
+<div class="empty-card">
+    <div class="empty-icon">🎒</div>
+    <p>No students enrolled in this class.</p>
+</div>
+{% else %}
+<div class="empty-card">
+    <div class="empty-icon">👆</div>
+    <p>Select a class above to start marking attendance.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SEL_DATE = "{{ sel_date }}";
+const CLASS_ID = "{{ class_id }}";
+
+function markAll(status) {
+    document.querySelectorAll(`input[value="${status}"]`).forEach(r => {
+        r.checked = true;
+        highlightRow(r);
+    });
+    updateCounts();
+}
+
+function highlightRow(radio) {
+    const row = radio.closest('tr');
+    row.className = 'row-' + radio.value.toLowerCase();
+}
+
+function updateCounts() {
+    const p = document.querySelectorAll('input[value="Present"]:checked').length;
+    const a = document.querySelectorAll('input[value="Absent"]:checked').length;
+    const pc = document.getElementById('presentCount');
+    const ac = document.getElementById('absentCount');
+    if (pc) pc.textContent = 'Present: ' + p;
+    if (ac) ac.textContent = 'Absent: '  + a;
+}
+
+function saveAttendance() {
+    const rows    = document.querySelectorAll('#attTable tbody tr');
+    const records = [];
+    rows.forEach(row => {
+        const sid    = row.dataset.sid;
+        const cid    = row.dataset.cid;
+        const picked = row.querySelector('input[type="radio"]:checked');
+        if (picked) records.push({ student_id: sid, class_id: cid, status: picked.value });
+    });
+    fetch('/attendance/mark', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: SEL_DATE, records })
+    })
+    .then(r => r.json())
+    .then(d => {
+        const el = document.getElementById('saveResult');
+        el.textContent     = '✅ ' + d.message;
+        el.className       = 'flash flash-success';
+        el.style.display   = 'block';
+        setTimeout(() => el.style.display = 'none', 4000);
+    });
+}
+
+// Colour pre-marked rows + update counts
+document.querySelectorAll('input[type="radio"]:checked').forEach(highlightRow);
+updateCounts();
+</script>
+{% endblock %}

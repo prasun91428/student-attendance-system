@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Reports – EduTrack{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Attendance Reports</h1>
+        <p class="page-sub">Monthly summary by course, branch &amp; semester</p>
+    </div>
+    {% if report_data %}
+    <button class="btn btn-secondary" onclick="window.print()">🖨 Print Report</button>
+    {% endif %}
+</div>
+
+<!-- Filter -->
+<div class="card filter-bar" style="margin-bottom:1.5rem">
+    <form method="GET" class="filter-form">
+        <select name="class_id" class="filter-select">
+            <option value="">— Select Class / Subject —</option>
+            {% set ns = namespace(cur_group='') %}
+            {% for cls in classes %}
+            {% set grp = cls.course ~ ' · ' ~ cls.branch ~ ' Sem ' ~ cls.semester ~ ' §' ~ cls.section %}
+            {% if grp != ns.cur_group %}
+            {% set ns.cur_group = grp %}
+            <optgroup label="━━ {{ grp }} ━━"></optgroup>
+            {% endif %}
+            <option value="{{ cls.id }}" {% if class_id==cls.id|string %}selected{% endif %}>
+                {{ cls.subject }}
+            </option>
+            {% endfor %}
+        </select>
+        <input type="month" name="month" value="{{ month }}" class="filter-input" />
+        <button type="submit" class="btn btn-primary">Generate Report</button>
+    </form>
+</div>
+
+{% if sel_class %}
+<div class="class-banner" style="margin-bottom:1.5rem">
+    <span class="course-pill course-{{ sel_class.course | lower }} pill-lg">{{ sel_class.course }}</span>
+    <div class="banner-details">
+        <strong>{{ sel_class.branch }}</strong> — {{ sel_class.subject }}
+        <span class="banner-meta">Semester {{ sel_class.semester }} &nbsp;|&nbsp; Section {{ sel_class.section }} &nbsp;|&nbsp; {{ month }}</span>
+    </div>
+</div>
+{% endif %}
+
+{% if report_data %}
+{% set total_p = report_data | sum(attribute='present') %}
+{% set total_a = report_data | sum(attribute='absent') %}
+{% set total_l = report_data | sum(attribute='late') %}
+{% set total_t = report_data | sum(attribute='total') %}
+
+<div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:1.5rem">
+    <div class="kpi-card kpi-blue">
+        <div class="kpi-icon">📅</div>
+        <div class="kpi-value">{{ total_t }}</div>
+        <div class="kpi-label">Total Records</div>
+    </div>
+    <div class="kpi-card kpi-green">
+        <div class="kpi-icon">✅</div>
+        <div class="kpi-value">{{ total_p }}</div>
+        <div class="kpi-label">Present</div>
+    </div>
+    <div class="kpi-card kpi-red">
+        <div class="kpi-icon">❌</div>
+        <div class="kpi-value">{{ total_a }}</div>
+        <div class="kpi-label">Absent</div>
+    </div>
+    <div class="kpi-card kpi-yellow">
+        <div class="kpi-icon">⏰</div>
+        <div class="kpi-value">{{ total_l }}</div>
+        <div class="kpi-label">Late</div>
+    </div>
+</div>
+
+<div class="card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>#</th><th>Roll No</th><th>Student Name</th>
+                <th>Present</th><th>Absent</th><th>Late</th>
+                <th>Total Days</th><th>Attendance %</th><th>Grade</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in report_data %}
+            {% set rate = ((r.present / r.total * 100) | round(1)) if r.total else 0 %}
+            {% if rate >= 90 %}{% set grade = 'A' %}
+            {% elif rate >= 75 %}{% set grade = 'B' %}
+            {% elif rate >= 60 %}{% set grade = 'C' %}
+            {% else %}{% set grade = 'D' %}{% endif %}
+            <tr class="{% if rate < 75 %}row-warning{% endif %}">
+                <td>{{ loop.index }}</td>
+                <td><code class="roll-badge">{{ r.roll_no }}</code></td>
+                <td><strong>{{ r.name }}</strong></td>
+                <td class="text-green">{{ r.present }}</td>
+                <td class="text-red">{{ r.absent }}</td>
+                <td class="text-yellow">{{ r.late }}</td>
+                <td>{{ r.total }}</td>
+                <td>
+                    <div class="inline-bar">
+                        <div class="bar-fill {% if rate < 75 %}bar-danger{% endif %}"
+                             style="width:{{ rate }}%"></div>
+                        <span class="bar-label">{{ rate }}%</span>
+                    </div>
+                </td>
+                <td><span class="badge badge-grade-{{ grade | lower }}">{{ grade }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<p class="report-note">⚠️ Students with attendance below 75% are highlighted in red.</p>
+
+{% else %}
+<div class="empty-card">
+    <div class="empty-icon">📊</div>
+    <p>Select a class and month to generate the attendance report.</p>
+</div>
+{% endif %}
+{% endblock %}

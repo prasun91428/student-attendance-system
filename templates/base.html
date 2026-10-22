@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Student Attendance System{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-icon">🎓</div>
+        <div>
+            <div class="brand-title">EduTrack</div>
+            <div class="brand-sub">Attendance Pro</div>
+        </div>
+    </div>
+
+    <nav class="sidebar-nav">
+        <a href="{{ url_for('dashboard') }}"  class="nav-item {% if request.endpoint=='dashboard'  %}active{% endif %}">
+            <span class="nav-icon">📊</span> Dashboard
+        </a>
+        <a href="{{ url_for('students') }}"   class="nav-item {% if request.endpoint=='students'   %}active{% endif %}">
+            <span class="nav-icon">👥</span> Students
+        </a>
+        <a href="{{ url_for('attendance') }}" class="nav-item {% if request.endpoint=='attendance' %}active{% endif %}">
+            <span class="nav-icon">✅</span> Mark Attendance
+        </a>
+        <a href="{{ url_for('reports') }}"    class="nav-item {% if request.endpoint=='reports'    %}active{% endif %}">
+            <span class="nav-icon">📋</span> Reports
+        </a>
+    </nav>
+
+    <div class="sidebar-footer">
+        <div class="footer-date">{{ today if today is defined else '' }}</div>
+        <div class="footer-label">Today's Date</div>
+    </div>
+</aside>
+
+<!-- Main content -->
+<main class="main-content">
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+</main>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

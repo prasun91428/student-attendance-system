@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Dashboard – EduTrack{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-sub">Real-time attendance overview · BTech &amp; BCA</p>
+    </div>
+    <div class="header-actions">
+        <a href="{{ url_for('attendance') }}" class="btn btn-primary">✅ Mark Today's Attendance</a>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="kpi-grid">
+    <div class="kpi-card kpi-blue">
+        <div class="kpi-icon">👥</div>
+        <div class="kpi-value">{{ total_students }}</div>
+        <div class="kpi-label">Total Students</div>
+    </div>
+    <div class="kpi-card kpi-purple">
+        <div class="kpi-icon">📚</div>
+        <div class="kpi-value">{{ total_classes }}</div>
+        <div class="kpi-label">Class Groups</div>
+    </div>
+    <div class="kpi-card kpi-green">
+        <div class="kpi-icon">✅</div>
+        <div class="kpi-value">{{ present_today }}</div>
+        <div class="kpi-label">Present Today</div>
+    </div>
+    <div class="kpi-card kpi-red">
+        <div class="kpi-icon">❌</div>
+        <div class="kpi-value">{{ absent_today }}</div>
+        <div class="kpi-label">Absent Today</div>
+    </div>
+    <div class="kpi-card kpi-yellow">
+        <div class="kpi-icon">⏰</div>
+        <div class="kpi-value">{{ late_today }}</div>
+        <div class="kpi-label">Late Today</div>
+    </div>
+    <div class="kpi-card kpi-teal">
+        <div class="kpi-icon">📝</div>
+        <div class="kpi-value">{{ marked_today }}</div>
+        <div class="kpi-label">Marked Today</div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="chart-row">
+    <div class="chart-card wide">
+        <div class="chart-header">
+            <h2 class="chart-title">Attendance Rate — Last 7 Days</h2>
+        </div>
+        <canvas id="lineChart" height="100"></canvas>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h2 class="chart-title">Today's Breakdown</h2>
+        </div>
+        <canvas id="donutChart" height="180"></canvas>
+        <div class="donut-legend">
+            <span class="legend-dot green"></span> Present: {{ present_today }}
+            <span class="legend-dot red"></span> Absent: {{ absent_today }}
+            <span class="legend-dot yellow"></span> Late: {{ late_today }}
+        </div>
+    </div>
+</div>
+
+<!-- Class Stats + Recent Activity -->
+<div class="chart-row">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h2 class="chart-title">Subject-wise Today</h2>
+        </div>
+        <div class="class-stats-list">
+            {% for cls in class_stats %}
+            {% set pct = ((cls.present / cls.total * 100) | round(1)) if cls.total else 0 %}
+            <div class="class-stat-row">
+                <div class="cls-info">
+                    <span class="cls-name">{{ cls.subject | truncate(22, True, '…') }}</span>
+                    <span class="cls-section">
+                        <span class="course-pill course-{{ cls.course | lower }}">{{ cls.course }}</span>
+                        {{ cls.branch }} · Sem {{ cls.semester }} · §{{ cls.section }}
+                    </span>
+                </div>
+                <div class="cls-bar-wrap">
+                    <div class="cls-bar" style="width:{{ pct }}%"></div>
+                </div>
+                <span class="cls-pct">{{ pct }}%</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="chart-card wide">
+        <div class="chart-header">
+            <h2 class="chart-title">Recent Activity</h2>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr><th>Student</th><th>Roll No</th><th>Course</th><th>Subject</th><th>Date</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+                {% for r in recent %}
+                <tr>
+                    <td>{{ r.student_name }}</td>
+                    <td><code>{{ r.roll_no }}</code></td>
+                    <td>
+                        <span class="course-pill course-{{ r.course | lower }}">{{ r.course }}</span>
+                        {{ r.branch }} Sem{{ r.semester }}
+                    </td>
+                    <td>{{ r.subject | truncate(24, True, '…') }}</td>
+                    <td>{{ r.date }}</td>
+                    <td><span class="badge badge-{{ r.status | lower }}">{{ r.status }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const sevenDays = {{ seven_days_data | safe }};
+const labels    = sevenDays.map(d => d.date.slice(5));
+const rates     = sevenDays.map(d => d.rate);
+
+new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: {
+        labels,
+        datasets: [{
+            label: 'Attendance %',
+            data: rates,
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99,102,241,0.12)',
+            borderWidth: 3,
+            pointBackgroundColor: '#6366f1',
+            pointRadius: 5,
+            tension: 0.4,
+            fill: true
+        }]
+    },
+    options: {
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { min: 0, max: 100,
+                 grid:  { color: 'rgba(255,255,255,0.05)' },
+                 ticks: { color: '#94a3b8', callback: v => v + '%' } },
+            x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+        }
+    }
+});
+
+new Chart(document.getElementById('donutChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Present','Absent','Late'],
+        datasets: [{
+            data: [{{ present_today }},{{ absent_today }},{{ late_today }}],
+            backgroundColor: ['#22c55e','#ef4444','#f59e0b'],
+            borderWidth: 0
+        }]
+    },
+    options: { cutout: '70%', plugins: { legend: { display: false } } }
+});
+</script>
+{% endblock %}
